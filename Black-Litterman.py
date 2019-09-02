@@ -8,7 +8,7 @@ def get_mkt_weights(stock_price_vec, shares_outstanding_vec):
 def get_Pi(lam, sigma, mkt_weights):
     return lam * np.matmul(sigma, mkt_weights)
 
-def get_new_return_vec(stock_price_vec, shares_outstanding_vec, Sigma, lam, tau, P, Q, Omega):
+def get_BL_Vec(stock_price_vec, shares_outstanding_vec, Sigma, lam, tau, P, Q, Omega):
     assert tau > 0, "tau <= 0"
 
     w_mkt = get_mkt_weights(stock_price_vec, shares_outstanding_vec)
@@ -18,16 +18,20 @@ def get_new_return_vec(stock_price_vec, shares_outstanding_vec, Sigma, lam, tau,
     
     if Omega.ndim == 1:
         inv_Omega = 1/Omega
-        inv_left = inv_tSigma + np.matmul(P, inv_Omega * P) # should be np.matmul(inv_Omega, P)
-        left = np.linalg.inv(inv_left)
-        right = np.matmul(inv_tSigma, Pi) + P*inv_Omega*Q # should be np.matmul(P, np.matmul(inv_Omega, Q))
-        return np.matmul(left, right)
+        M = inv_tSigma + np.matmul(P, inv_Omega * P)
+        inv_M = np.linalg.inv(M)
+        right = np.matmul(inv_tSigma, Pi) + P*inv_Omega*Q
+        new_Mu = np.matmul(inv_M, right)
+        new_Sigma = Sigma + inv_M
+        return new_Sigma, new_Mu
     else:
         inv_Omega = np.linalg.inv(Omega)
-        inv_left = inv_tSigma + np.matmul(P,np.matmul(inv_Omega, P))
-        left = np.linalg.inv(inv_left)
+        M = inv_tSigma + np.matmul(P,np.matmul(inv_Omega, P))
+        inv_M = np.linalg.inv(M)
         right = np.matmul(inv_tSigma, Pi) + np.matmul(P, np.matmul(inv_Omega, Q))
-        return np.matmul(left, right)
+        Mu_bar = np.matmul(inv_M, right)
+        Sigma_bar = Sigma + inv_M
+        return Sigma_bar, Mu_bar
 
 def get_Markowitz_Portfolio(return_vec, Sigma, desired_return):
     """
@@ -71,16 +75,16 @@ Q = np.array([0.02])
 Omega = np.array([0.25])
 tau = 1
 
-new_return_vec = get_new_return_vec(sp_vec, so_vec,Sigma,lam,tau,P,Q,Omega)
-print(new_return_vec)
+Sigma_bar, Mu_bar = get_BL_Vec(sp_vec, so_vec,Sigma,lam,tau,P,Q,Omega)
+
 from matplotlib import pyplot as plt
 
 plt.style.use('seaborn')
 
-desired_returns = np.linspace(min(new_return_vec), max(new_return_vec), 100)
+desired_returns = np.linspace(min(Mu_bar), max(Mu_bar), 100)
 
 for desired_return in desired_returns:
-    std, mean = get_Markowitz_Portfolio_Vec(new_return_vec, Sigma, desired_return)
+    std, mean = get_Markowitz_Portfolio_Vec(Mu_bar, Sigma_bar, desired_return)
     plt.scatter(std, mean, c='teal')
 
 plt.show()
